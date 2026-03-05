@@ -1,0 +1,1348 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flip ROI Calculator</title>
+  <style>
+    :root{
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --border-2:#d1d5db;
+      --accent: #111827;
+      --good: #047857;
+      --bad: #b91c1c;
+      --warn: #b45309;
+      --shadow: 0 10px 30px rgba(17,24,39,0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --focus: 0 0 0 3px rgba(17,24,39,0.15);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.25;
+    }
+
+    /* Widget container: safe to drop into any page */
+    .flip-roi-widget{
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    .widget-shell{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .widget-header{
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #ffffff 0%, #fbfbfc 100%);
+    }
+    .widget-title{
+      margin:0;
+      font-size: 18px;
+      letter-spacing: -0.01em;
+    }
+    .widget-subtitle{
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 70ch;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 14px;
+      padding: 14px;
+    }
+
+    @media (max-width: 920px){
+      .grid{
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .section-title{
+      display:flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 10px;
+    }
+    .section-title h2{
+      margin:0;
+      font-size: 14px;
+      letter-spacing: -0.01em;
+    }
+    .section-title .hint{
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .mode-toggle{
+      display:flex;
+      gap: 10px;
+      align-items:center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .pillset{
+      display:flex;
+      gap: 8px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+    }
+    .pill{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      user-select: none;
+      font-size: 13px;
+      color: var(--muted);
+      background: transparent;
+      transition: 150ms ease;
+      outline: none;
+    }
+    .pill input{
+      position:absolute;
+      opacity:0;
+      pointer-events:none;
+    }
+    .pill[data-checked="true"]{
+      background: #111827;
+      color: #fff;
+    }
+    .pill:focus-within{
+      box-shadow: var(--focus);
+    }
+
+    .form-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 640px){
+      .form-grid{
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .field{
+      display:flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    label{
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .help{
+      font-size: 12px;
+      color: var(--muted);
+    }
+    input[type="number"], select{
+      width: 100%;
+      border: 1px solid var(--border-2);
+      border-radius: 10px;
+      padding: 10px 11px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      transition: 150ms ease;
+    }
+    input[type="number"]:focus, select:focus{
+      box-shadow: var(--focus);
+      border-color: #9ca3af;
+    }
+    input[type="checkbox"]{
+      width: 16px;
+      height: 16px;
+      accent-color: #111827;
+    }
+    .inline{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .inline .help{
+      margin:0;
+    }
+
+    .divider{
+      height: 1px;
+      background: var(--border);
+      margin: 12px 0;
+    }
+
+    .loan-only{
+      display:none;
+    }
+    .loan-only[data-show="true"]{
+      display:block;
+    }
+
+    .actions{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    button{
+      border: 1px solid var(--border-2);
+      background: #fff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      cursor:pointer;
+      transition: 150ms ease;
+    }
+    button:hover{
+      border-color: #9ca3af;
+    }
+    button.primary{
+      background:#111827;
+      color:#fff;
+      border-color:#111827;
+    }
+    button.primary:hover{
+      filter: brightness(0.95);
+    }
+    button:focus{
+      outline:none;
+      box-shadow: var(--focus);
+    }
+
+    .errors{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(185,28,28,0.25);
+      background: rgba(185,28,28,0.06);
+      border-radius: 12px;
+      display:none;
+    }
+    .errors[data-show="true"]{
+      display:block;
+    }
+    .errors h3{
+      margin:0 0 6px;
+      font-size: 13px;
+      color: var(--bad);
+    }
+    .errors ul{
+      margin:0;
+      padding-left: 18px;
+      color: var(--bad);
+      font-size: 12px;
+    }
+
+    .results{
+      position: sticky;
+      top: 12px;
+      align-self: start;
+    }
+    @media (max-width: 920px){
+      .results{
+        position: static;
+      }
+    }
+    .kpi{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .kpi .tile{
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+    }
+    .kpi .tile .label{
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .kpi .tile .value{
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .kpi .tile .value.good{ color: var(--good); }
+    .kpi .tile .value.bad{ color: var(--bad); }
+
+    .details{
+      margin-top: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      display:flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .row{
+      display:flex;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+    }
+    .row .left{
+      display:flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .row .name{
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .row .desc{
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .row .right{
+      font-family: var(--mono);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .note{
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .note code{
+      font-family: var(--mono);
+      font-size: 12px;
+      background: #f3f4f6;
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="flip-roi-widget" id="flipRoiWidget">
+    <div class="widget-shell" role="region" aria-label="Flip ROI Calculator Widget">
+      <header class="widget-header">
+        <h1 class="widget-title">Flip ROI Calculator</h1>
+        <p class="widget-subtitle">
+          Estimate net profit, ROI, and (when financed) cash-on-cash return for a flip. Auto-calculates as you type. Assumes interest-only payments in loan mode.
+        </p>
+
+        <div class="mode-toggle" aria-label="Financing Mode">
+          <div class="pillset" role="radiogroup" aria-label="Choose financing mode">
+            <label class="pill" id="pillCash" data-checked="true">
+              <input type="radio" name="mode" value="cash" checked />
+              All Cash
+            </label>
+            <label class="pill" id="pillLoan" data-checked="false">
+              <input type="radio" name="mode" value="loan" />
+              Loan
+            </label>
+          </div>
+          <div class="help">Loan fields appear only when “Loan” is selected.</div>
+        </div>
+      </header>
+
+      <main class="grid">
+        <!-- Inputs -->
+        <section class="card" aria-label="Inputs">
+          <div class="section-title">
+            <h2>Inputs</h2>
+            <div class="hint">Numbers only. No negatives.</div>
+          </div>
+
+          <form id="roiForm" novalidate>
+            <div class="divider"></div>
+
+            <div class="section-title">
+              <h2>Purchase &amp; Project</h2>
+              <div class="hint">Costs during the project</div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="purchasePrice">Purchase Price ($)</label>
+                <input id="purchasePrice" type="number" min="0" step="100" inputmode="decimal" />
+                <div class="help">Contract price to buy the property.</div>
+              </div>
+
+              <div class="field">
+                <label for="purchaseClosingCosts">Closing Costs on Purchase ($)</label>
+                <input id="purchaseClosingCosts" type="number" min="0" step="50" inputmode="decimal" />
+                <div class="help">Title, attorney, lender admin, etc. Default 0.</div>
+              </div>
+
+              <div class="field">
+                <label for="renoBudget">Renovation Budget ($)</label>
+                <input id="renoBudget" type="number" min="0" step="100" inputmode="decimal" />
+                <div class="help">Planned rehab spend before contingency.</div>
+              </div>
+
+              <div class="field">
+                <label for="contingencyPct">Contingency (%)</label>
+                <input id="contingencyPct" type="number" min="0" step="0.5" inputmode="decimal" />
+                <div class="help">Applied to renovation budget. Default 10%.</div>
+              </div>
+
+              <div class="field">
+                <label for="holdingMonths">Holding Period (months)</label>
+                <input id="holdingMonths" type="number" min="0" step="1" inputmode="numeric" />
+                <div class="help">From purchase to sale closing.</div>
+              </div>
+
+              <div class="field">
+                <label for="monthlyHolding">Monthly Holding Costs ($)</label>
+                <input id="monthlyHolding" type="number" min="0" step="50" inputmode="decimal" />
+                <div class="help">Utilities, taxes, insurance, etc. Excludes loan interest (counted separately in loan mode).</div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section-title">
+              <h2>Sale / Exit</h2>
+              <div class="hint">What you sell for</div>
+            </div>
+
+            <div class="form-grid">
+              <div class="field">
+                <label for="salePrice">After Repair Value / Sale Price ($)</label>
+                <input id="salePrice" type="number" min="0" step="100" inputmode="decimal" />
+                <div class="help">Expected sale price (ARV).</div>
+              </div>
+
+              <div class="field">
+                <label for="sellingCostPct">Selling Costs (% of sale price)</label>
+                <input id="sellingCostPct" type="number" min="0" step="0.25" inputmode="decimal" />
+                <div class="help">Agent commissions + seller closing costs. Default 8%.</div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Loan-only -->
+            <section class="loan-only" id="loanOnlySection" data-show="false" aria-label="Loan Inputs">
+              <div class="section-title">
+                <h2>Loan Details</h2>
+                <div class="hint">Only in loan mode</div>
+              </div>
+
+              <div class="form-grid">
+                <div class="field">
+                  <label for="downPaymentPct">Down Payment (%)</label>
+                  <input id="downPaymentPct" type="number" min="0" max="100" step="0.5" inputmode="decimal" />
+                  <div class="help">Percent of purchase price paid in cash. Default 20%.</div>
+                </div>
+
+                <div class="field">
+                  <label for="aprPct">Loan Interest Rate (APR %)</label>
+                  <input id="aprPct" type="number" min="0" step="0.25" inputmode="decimal" />
+                  <div class="help">Annual interest rate. Default 9%.</div>
+                </div>
+
+                <div class="field">
+                  <label for="loanTermMonths">Loan Term (months)</label>
+                  <input id="loanTermMonths" type="number" min="0" step="1" inputmode="numeric" />
+                  <div class="help">Default = holding period. Interest is calculated over holding period regardless.</div>
+                </div>
+
+                <div class="field">
+                  <label for="pointsPct">Points (% of loan amount)</label>
+                  <input id="pointsPct" type="number" min="0" step="0.25" inputmode="decimal" />
+                  <div class="help">Upfront points at closing. Default 2%.</div>
+                </div>
+
+                <div class="field">
+                  <label for="originationFees">Loan Origination / Fees ($)</label>
+                  <input id="originationFees" type="number" min="0" step="50" inputmode="decimal" />
+                  <div class="help">Flat lender fees. Default 0.</div>
+                </div>
+
+                <div class="field">
+                  <label for="interestType">Interest Type</label>
+                  <select id="interestType">
+                    <option value="interestOnly" selected>Interest-only (monthly)</option>
+                    <option value="simpleAccrual">Simple interest accrual (no monthly payment)</option>
+                  </select>
+                  <div class="help">Both methods produce the same total interest; payment timing differs.</div>
+                </div>
+
+                <div class="field" style="grid-column: 1 / -1;">
+                  <div class="inline">
+                    <input id="rehabFinanced" type="checkbox" />
+                    <label for="rehabFinanced" style="font-weight:700;">Rehab financed?</label>
+                    <div class="help">If checked, rehab principal is added to the loan payoff and interest is calculated on the combined principal.</div>
+                  </div>
+                </div>
+
+                <div class="field" id="rehabLoanWrap" style="display:none;">
+                  <label for="rehabLoanAmount">Rehab Loan Amount ($)</label>
+                  <input id="rehabLoanAmount" type="number" min="0" step="100" inputmode="decimal" />
+                  <div class="help">Amount of rehab funded by the loan. Keep it ≤ total rehab cost.</div>
+                </div>
+
+                <div class="field" id="rehabLoanSpacer" style="display:none;">
+                  <label class="sr-only" for="rehabLoanAmountSpacer">Spacer</label>
+                  <input id="rehabLoanAmountSpacer" type="hidden" />
+                  <div class="help"> </div>
+                </div>
+              </div>
+
+              <div class="note">
+                Rehab financing model used here: <code>Loan Payoff = Purchase Loan Principal + Rehab Loan Principal</code>, and interest is calculated on the combined principal over the holding period. This keeps the math simple and avoids double-counting.
+              </div>
+            </section>
+
+            <div class="errors" id="errorBox" data-show="false" aria-live="polite">
+              <h3>Fix these inputs</h3>
+              <ul id="errorList"></ul>
+            </div>
+
+            <div class="actions">
+              <button type="button" id="resetBtn">Reset</button>
+              <button type="button" class="primary" id="calcBtn">Calculate</button>
+            </div>
+
+            <div class="note">
+              Tip: If you want the ROI denominator to be “total project costs” instead of “cash invested,” change it in the code where noted. This widget intentionally uses cash invested so ROI makes sense when leverage is used.
+            </div>
+          </form>
+        </section>
+
+        <!-- Results -->
+        <aside class="card results" aria-label="Results">
+          <div class="section-title">
+            <h2>Results</h2>
+            <div class="hint" id="modeLabel">Mode: All Cash</div>
+          </div>
+
+          <div class="kpi" aria-label="Key Metrics">
+            <div class="tile">
+              <div class="label">Net Profit</div>
+              <div class="value" id="outNetProfit">$0</div>
+            </div>
+            <div class="tile">
+              <div class="label" id="outRoiLabel">ROI</div>
+              <div class="value" id="outRoiPct">0%</div>
+            </div>
+          </div>
+
+          <div class="details" aria-label="Details">
+            <div class="row">
+              <div class="left">
+                <div class="name">Total Cash Invested</div>
+                <div class="desc">Your out-of-pocket cash</div>
+              </div>
+              <div class="right" id="outCashInvested">$0</div>
+            </div>
+
+            <div class="row">
+              <div class="left">
+                <div class="name">Net Proceeds at Sale</div>
+                <div class="desc">Sale price minus selling costs</div>
+              </div>
+              <div class="right" id="outNetProceeds">$0</div>
+            </div>
+
+            <div class="row">
+              <div class="left">
+                <div class="name">Total Project Costs</div>
+                <div class="desc">Economic costs for the project</div>
+              </div>
+              <div class="right" id="outTotalCosts">$0</div>
+            </div>
+
+            <div class="row">
+              <div class="left">
+                <div class="name">Selling Costs</div>
+                <div class="desc">Percent of sale price</div>
+              </div>
+              <div class="right" id="outSellingCosts">$0</div>
+            </div>
+
+            <div class="row">
+              <div class="left">
+                <div class="name">Total Rehab (incl. contingency)</div>
+                <div class="desc">Budget + contingency</div>
+              </div>
+              <div class="right" id="outRehabTotal">$0</div>
+            </div>
+
+            <div class="row">
+              <div class="left">
+                <div class="name">Total Holding</div>
+                <div class="desc">Monthly holding × months (excluding interest)</div>
+              </div>
+              <div class="right" id="outHoldingTotal">$0</div>
+            </div>
+
+            <div class="row">
+              <div class="left">
+                <div class="name">Break-even Sale Price</div>
+                <div class="desc">Sale price needed for $0 profit</div>
+              </div>
+              <div class="right" id="outBreakeven">$0</div>
+            </div>
+
+            <div class="row">
+              <div class="left">
+                <div class="name">Profit per Month</div>
+                <div class="desc">Net profit ÷ holding months</div>
+              </div>
+              <div class="right" id="outProfitPerMonth">$0</div>
+            </div>
+          </div>
+
+          <section class="loan-only" id="loanOutputs" data-show="false" aria-label="Loan Breakdown">
+            <div class="divider"></div>
+            <div class="section-title">
+              <h2>Loan Breakdown</h2>
+              <div class="hint">Payoff and interest</div>
+            </div>
+
+            <div class="details">
+              <div class="row">
+                <div class="left">
+                  <div class="name">Purchase Loan Amount</div>
+                  <div class="desc">Purchase price × (1 − down payment)</div>
+                </div>
+                <div class="right" id="outLoanAmount">$0</div>
+              </div>
+
+              <div class="row">
+                <div class="left">
+                  <div class="name">Down Payment</div>
+                  <div class="desc">Cash portion of purchase</div>
+                </div>
+                <div class="right" id="outDownPayment">$0</div>
+              </div>
+
+              <div class="row">
+                <div class="left">
+                  <div class="name">Points</div>
+                  <div class="desc">Percent of loan amount</div>
+                </div>
+                <div class="right" id="outPoints">$0</div>
+              </div>
+
+              <div class="row">
+                <div class="left">
+                  <div class="name">Total Interest Paid</div>
+                  <div class="desc">Interest-only on principal over holding period</div>
+                </div>
+                <div class="right" id="outInterest">$0</div>
+              </div>
+
+              <div class="row">
+                <div class="left">
+                  <div class="name">Loan Payoff at Sale</div>
+                  <div class="desc">Principal paid off at closing</div>
+                </div>
+                <div class="right" id="outPayoff">$0</div>
+              </div>
+
+              <div class="row">
+                <div class="left">
+                  <div class="name">Net Cash After Payoff</div>
+                  <div class="desc">Net proceeds − payoff</div>
+                </div>
+                <div class="right" id="outNetAfterPayoff">$0</div>
+              </div>
+            </div>
+          </section>
+
+          <div class="note">
+            Disclaimer: This is a planning calculator. It does not include taxes, depreciation recapture, or financing nuances like draws, rehab holdbacks, prepayment penalties, or variable rates.
+          </div>
+        </aside>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      "use strict";
+
+      // -----------------------------
+      // Defaults (edit these as needed)
+      // -----------------------------
+      const DEFAULTS = {
+        mode: "cash", // "cash" | "loan"
+
+        // Purchase & Project
+        purchasePrice: 180000,
+        purchaseClosingCosts: 0,
+        renoBudget: 35000,
+        contingencyPct: 10,
+        holdingMonths: 5,
+        monthlyHolding: 750,
+
+        // Sale / Exit
+        salePrice: 275000,
+        sellingCostPct: 8,
+
+        // Loan-only
+        downPaymentPct: 20,
+        aprPct: 9,
+        loanTermMonths: 0, // 0 means "default to holding months"
+        pointsPct: 2,
+        originationFees: 0,
+        interestType: "interestOnly", // "interestOnly" | "simpleAccrual"
+        rehabFinanced: false,
+        rehabLoanAmount: 0
+      };
+
+      // -----------------------------
+      // Elements
+      // -----------------------------
+      const form = document.getElementById("roiForm");
+
+      const el = {
+        // Mode
+        pillCash: document.getElementById("pillCash"),
+        pillLoan: document.getElementById("pillLoan"),
+        modeRadios: Array.from(document.querySelectorAll('input[name="mode"]')),
+        modeLabel: document.getElementById("modeLabel"),
+
+        // Common inputs
+        purchasePrice: document.getElementById("purchasePrice"),
+        purchaseClosingCosts: document.getElementById("purchaseClosingCosts"),
+        renoBudget: document.getElementById("renoBudget"),
+        contingencyPct: document.getElementById("contingencyPct"),
+        holdingMonths: document.getElementById("holdingMonths"),
+        monthlyHolding: document.getElementById("monthlyHolding"),
+
+        salePrice: document.getElementById("salePrice"),
+        sellingCostPct: document.getElementById("sellingCostPct"),
+
+        // Loan inputs
+        loanOnlySection: document.getElementById("loanOnlySection"),
+        downPaymentPct: document.getElementById("downPaymentPct"),
+        aprPct: document.getElementById("aprPct"),
+        loanTermMonths: document.getElementById("loanTermMonths"),
+        pointsPct: document.getElementById("pointsPct"),
+        originationFees: document.getElementById("originationFees"),
+        interestType: document.getElementById("interestType"),
+
+        rehabFinanced: document.getElementById("rehabFinanced"),
+        rehabLoanWrap: document.getElementById("rehabLoanWrap"),
+        rehabLoanSpacer: document.getElementById("rehabLoanSpacer"),
+        rehabLoanAmount: document.getElementById("rehabLoanAmount"),
+
+        // Buttons
+        resetBtn: document.getElementById("resetBtn"),
+        calcBtn: document.getElementById("calcBtn"),
+
+        // Errors
+        errorBox: document.getElementById("errorBox"),
+        errorList: document.getElementById("errorList"),
+
+        // Outputs (common)
+        outNetProfit: document.getElementById("outNetProfit"),
+        outRoiLabel: document.getElementById("outRoiLabel"),
+        outRoiPct: document.getElementById("outRoiPct"),
+
+        outCashInvested: document.getElementById("outCashInvested"),
+        outNetProceeds: document.getElementById("outNetProceeds"),
+        outTotalCosts: document.getElementById("outTotalCosts"),
+        outSellingCosts: document.getElementById("outSellingCosts"),
+        outRehabTotal: document.getElementById("outRehabTotal"),
+        outHoldingTotal: document.getElementById("outHoldingTotal"),
+        outBreakeven: document.getElementById("outBreakeven"),
+        outProfitPerMonth: document.getElementById("outProfitPerMonth"),
+
+        // Outputs (loan)
+        loanOutputs: document.getElementById("loanOutputs"),
+        outLoanAmount: document.getElementById("outLoanAmount"),
+        outDownPayment: document.getElementById("outDownPayment"),
+        outPoints: document.getElementById("outPoints"),
+        outInterest: document.getElementById("outInterest"),
+        outPayoff: document.getElementById("outPayoff"),
+        outNetAfterPayoff: document.getElementById("outNetAfterPayoff")
+      };
+
+      // -----------------------------
+      // Formatting helpers
+      // -----------------------------
+      const fmtCurrency = (n) => {
+        if (!isFinite(n)) return "$0";
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 0
+        }).format(n);
+      };
+
+      const fmtCurrency2 = (n) => {
+        if (!isFinite(n)) return "$0.00";
+        return new Intl.NumberFormat(undefined, {
+          style: "currency",
+          currency: "USD",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(n);
+      };
+
+      const fmtPct = (n) => {
+        if (!isFinite(n)) return "0%";
+        return new Intl.NumberFormat(undefined, {
+          style: "percent",
+          maximumFractionDigits: 2
+        }).format(n);
+      };
+
+      const clampNonNegative = (n) => Math.max(0, n);
+
+      const toNum = (value) => {
+        const n = Number(value);
+        return isFinite(n) ? n : 0;
+      };
+
+      // -----------------------------
+      // State & UI wiring
+      // -----------------------------
+      function setMode(mode){
+        const isLoan = mode === "loan";
+        el.pillCash.dataset.checked = (!isLoan).toString();
+        el.pillLoan.dataset.checked = (isLoan).toString();
+
+        el.loanOnlySection.dataset.show = isLoan.toString();
+        el.loanOutputs.dataset.show = isLoan.toString();
+        el.modeLabel.textContent = "Mode: " + (isLoan ? "Loan" : "All Cash");
+
+        // ROI label changes for loan mode (still same calculation here)
+        el.outRoiLabel.textContent = isLoan ? "Cash-on-Cash Return" : "ROI";
+
+        // Default loan term if blank/0
+        if (isLoan){
+          const term = toNum(el.loanTermMonths.value);
+          if (term === 0){
+            el.loanTermMonths.value = String(toNum(el.holdingMonths.value) || DEFAULTS.holdingMonths);
+          }
+        }
+
+        // Rehab financed UI
+        toggleRehabFinancedUI();
+
+        recalcAndRender();
+      }
+
+      function toggleRehabFinancedUI(){
+        const isLoan = getMode() === "loan";
+        const financed = !!el.rehabFinanced.checked;
+
+        const show = isLoan && financed;
+        el.rehabLoanWrap.style.display = show ? "block" : "none";
+        el.rehabLoanSpacer.style.display = show ? "block" : "none";
+
+        if (!show){
+          el.rehabLoanAmount.value = "0";
+        }
+      }
+
+      function getMode(){
+        const selected = el.modeRadios.find(r => r.checked);
+        return selected ? selected.value : "cash";
+      }
+
+      // -----------------------------
+      // Validation
+      // -----------------------------
+      function validateInputs(values){
+        const errors = [];
+
+        // Generic no-negative checks
+        const nonNegFields = [
+          ["Purchase Price", values.purchasePrice],
+          ["Purchase Closing Costs", values.purchaseClosingCosts],
+          ["Renovation Budget", values.renoBudget],
+          ["Contingency %", values.contingencyPct],
+          ["Holding Months", values.holdingMonths],
+          ["Monthly Holding Costs", values.monthlyHolding],
+          ["Sale Price", values.salePrice],
+          ["Selling Costs %", values.sellingCostPct]
+        ];
+
+        if (values.mode === "loan"){
+          nonNegFields.push(
+            ["Down Payment %", values.downPaymentPct],
+            ["APR %", values.aprPct],
+            ["Loan Term Months", values.loanTermMonths],
+            ["Points %", values.pointsPct],
+            ["Loan Origination/Fees", values.originationFees]
+          );
+          if (values.rehabFinanced){
+            nonNegFields.push(["Rehab Loan Amount", values.rehabLoanAmount]);
+          }
+        }
+
+        for (const [name, v] of nonNegFields){
+          if (v < 0) errors.push(`${name} cannot be negative.`);
+        }
+
+        if (values.holdingMonths === 0){
+          // Not "invalid" but makes some outputs weird; still allow it, but warn as error for clarity.
+          errors.push("Holding Period (months) should be at least 1 for meaningful results.");
+        }
+
+        if (values.sellingCostPct > 100) errors.push("Selling Costs % cannot exceed 100%.");
+        if (values.contingencyPct > 300) errors.push("Contingency % looks very high. Double-check it.");
+        if (values.mode === "loan"){
+          if (values.downPaymentPct > 100) errors.push("Down Payment % cannot exceed 100%.");
+          if (values.aprPct > 100) errors.push("APR % cannot exceed 100%.");
+          if (values.pointsPct > 50) errors.push("Points % looks very high. Double-check it.");
+
+          // Rehab loan amount must be <= total rehab cost
+          const contingencyAmt = values.renoBudget * (values.contingencyPct / 100);
+          const totalRehab = values.renoBudget + contingencyAmt;
+          if (values.rehabFinanced && values.rehabLoanAmount > totalRehab){
+            errors.push("Rehab Loan Amount cannot exceed Total Rehab Cost (budget + contingency).");
+          }
+        }
+
+        return errors;
+      }
+
+      function showErrors(errors){
+        el.errorList.innerHTML = "";
+        if (!errors.length){
+          el.errorBox.dataset.show = "false";
+          return;
+        }
+        el.errorBox.dataset.show = "true";
+        for (const msg of errors){
+          const li = document.createElement("li");
+          li.textContent = msg;
+          el.errorList.appendChild(li);
+        }
+      }
+
+      // -----------------------------
+      // Read values from the form
+      // -----------------------------
+      function readValues(){
+        const mode = getMode();
+
+        // Common
+        const purchasePrice = clampNonNegative(toNum(el.purchasePrice.value));
+        const purchaseClosingCosts = clampNonNegative(toNum(el.purchaseClosingCosts.value));
+        const renoBudget = clampNonNegative(toNum(el.renoBudget.value));
+        const contingencyPct = clampNonNegative(toNum(el.contingencyPct.value));
+        const holdingMonths = clampNonNegative(Math.floor(toNum(el.holdingMonths.value)));
+        const monthlyHolding = clampNonNegative(toNum(el.monthlyHolding.value));
+
+        const salePrice = clampNonNegative(toNum(el.salePrice.value));
+        const sellingCostPct = clampNonNegative(toNum(el.sellingCostPct.value));
+
+        // Loan-only
+        const downPaymentPct = clampNonNegative(toNum(el.downPaymentPct.value));
+        const aprPct = clampNonNegative(toNum(el.aprPct.value));
+        let loanTermMonths = clampNonNegative(Math.floor(toNum(el.loanTermMonths.value)));
+        const pointsPct = clampNonNegative(toNum(el.pointsPct.value));
+        const originationFees = clampNonNegative(toNum(el.originationFees.value));
+        const interestType = el.interestType.value || "interestOnly";
+
+        const rehabFinanced = !!el.rehabFinanced.checked;
+        const rehabLoanAmount = clampNonNegative(toNum(el.rehabLoanAmount.value));
+
+        // If loan term not set, default to holding months
+        if (mode === "loan" && (!loanTermMonths || loanTermMonths === 0)){
+          loanTermMonths = holdingMonths;
+        }
+
+        return {
+          mode,
+          purchasePrice,
+          purchaseClosingCosts,
+          renoBudget,
+          contingencyPct,
+          holdingMonths,
+          monthlyHolding,
+          salePrice,
+          sellingCostPct,
+          downPaymentPct,
+          aprPct,
+          loanTermMonths,
+          pointsPct,
+          originationFees,
+          interestType,
+          rehabFinanced,
+          rehabLoanAmount
+        };
+      }
+
+      // -----------------------------
+      // Core calculations
+      // -----------------------------
+      function calculate(values){
+        /*
+          COMMON CALCS (used in both modes)
+          - Contingency Amount = Renovation Budget * (Contingency %)
+          - Total Rehab Cost = Renovation Budget + Contingency Amount
+          - Total Holding Cost = Monthly Holding Costs * Holding Period
+          - Selling Cost $ = Sale Price * (Selling Costs %)
+          - Net Proceeds at Sale = Sale Price - Selling Cost $
+          - Break-even Sale Price:
+              Solve for S where Profit = 0, and selling costs scale with S:
+              Profit = S - (S * sellPct) - totalCostsExclSelling = 0
+              => S * (1 - sellPct) = totalCostsExclSelling
+              => S = totalCostsExclSelling / (1 - sellPct)
+        */
+
+        const sellPct = values.sellingCostPct / 100;
+        const contingencyAmt = values.renoBudget * (values.contingencyPct / 100);
+        const totalRehab = values.renoBudget + contingencyAmt;
+        const totalHolding = values.monthlyHolding * values.holdingMonths;
+
+        const sellingCosts = values.salePrice * sellPct;
+        const netProceeds = values.salePrice - sellingCosts;
+
+        if (values.mode === "cash"){
+          /*
+            ALL CASH MODE
+            - Total Cash Invested = Purchase Price + Purchase Closing Costs + Total Rehab Cost + Total Holding Cost
+            - Total Costs = same as total cash invested
+            - Net Profit = Net Proceeds at Sale - Total Costs
+            - ROI % = Net Profit / Total Cash Invested * 100
+          */
+          const cashInvested = values.purchasePrice + values.purchaseClosingCosts + totalRehab + totalHolding;
+          const totalCosts = cashInvested; // economic costs excluding selling costs? We'll show "project costs" excluding selling costs? Requirements ask "Total Project Costs ($)" and also show Selling Costs separately.
+          // We'll treat Total Project Costs as: purchase + purchase closing + rehab + holding + selling costs
+          const totalProjectCosts = totalCosts + sellingCosts;
+
+          const netProfit = netProceeds - totalCosts;
+
+          const roi = cashInvested > 0 ? (netProfit / cashInvested) : 0;
+
+          const totalCostsExclSellingForBreakeven = totalCosts; // because selling scales with sale price
+          const breakeven = (1 - sellPct) > 0 ? (totalCostsExclSellingForBreakeven / (1 - sellPct)) : Infinity;
+
+          const profitPerMonth = values.holdingMonths > 0 ? (netProfit / values.holdingMonths) : netProfit;
+
+          return {
+            mode: "cash",
+            contingencyAmt,
+            totalRehab,
+            totalHolding,
+            sellingCosts,
+            netProceeds,
+            cashInvested,
+            totalProjectCosts,
+            totalCostsExclSellingForBreakeven,
+            breakeven,
+            netProfit,
+            roi,
+            coc: null, // not applicable
+            // loan outputs empty
+            loanAmount: 0,
+            downPayment: 0,
+            points: 0,
+            totalInterest: 0,
+            payoff: 0,
+            netAfterPayoff: 0,
+            profitPerMonth
+          };
+        }
+
+        // LOAN MODE
+        /*
+          LOAN MODE CALCS
+
+          - Loan Amount (purchase) = Purchase Price * (1 - Down Payment %)
+          - Down Payment $ = Purchase Price * (Down Payment %)
+          - Points $ = Loan Amount * (Points %)
+          - Rehab financed model (simple):
+              If rehab is financed:
+                - Rehab Loan Principal = Rehab Loan Amount (user input)
+                - Total Loan Principal = Purchase Loan Principal + Rehab Loan Principal
+              Else:
+                - Rehab Loan Principal = 0
+                - Total Loan Principal = Purchase Loan Principal
+
+          - Monthly Interest Payment (interest-only) = Total Loan Principal * (APR/12)
+          - Total Interest Paid = Monthly Interest Payment * Holding Months
+            (holding months used even if loan term differs, per requirement)
+
+          - Total Cash Invested (loan mode) =
+              Down Payment +
+              Purchase Closing Costs +
+              Points +
+              Origination Fees +
+              (Total Rehab if NOT financed) +
+              Total Holding (excluding interest) +
+              Total Interest Paid
+            (Important: do not double count interest inside holding)
+
+          - Net Proceeds at Sale (before payoff) = Sale Price - Selling Costs
+          - Loan Payoff at Sale = Total Loan Principal
+          - Net Cash from Sale After Payoff = Net Proceeds - Payoff
+          - Net Profit (loan mode) = Net Cash After Payoff - Total Cash Invested
+          - ROI (cash-on-cash) = Net Profit / Total Cash Invested
+        */
+
+        const dpPct = values.downPaymentPct / 100;
+        const apr = values.aprPct / 100;
+
+        const purchaseLoanAmount = values.purchasePrice * (1 - dpPct);
+        const downPayment = values.purchasePrice * dpPct;
+
+        const points = purchaseLoanAmount * (values.pointsPct / 100);
+        const rehabLoanPrincipal = values.rehabFinanced ? values.rehabLoanAmount : 0;
+
+        // Combined principal for interest (simple model)
+        const totalLoanPrincipal = purchaseLoanAmount + rehabLoanPrincipal;
+
+        const monthlyInterest = totalLoanPrincipal * (apr / 12);
+        const totalInterest = monthlyInterest * values.holdingMonths;
+
+        const rehabCashPortion = values.rehabFinanced ? Math.max(0, totalRehab - rehabLoanPrincipal) : totalRehab;
+
+        const cashInvested =
+          downPayment +
+          values.purchaseClosingCosts +
+          points +
+          values.originationFees +
+          rehabCashPortion +
+          totalHolding +
+          totalInterest;
+
+        const payoff = totalLoanPrincipal;
+
+        const netAfterPayoff = netProceeds - payoff;
+        const netProfit = netAfterPayoff - cashInvested;
+
+        const roi = cashInvested > 0 ? (netProfit / cashInvested) : 0;
+        const coc = roi; // same denominator and numerator here; label differs for clarity
+
+        // For display: "Total Project Costs" = all economic costs including selling + financing costs
+        const totalProjectCosts =
+          values.purchasePrice +
+          values.purchaseClosingCosts +
+          totalRehab +
+          totalHolding +
+          sellingCosts +
+          points +
+          values.originationFees +
+          totalInterest;
+
+        // For breakeven, we want total costs excluding selling (since selling scales with sale price)
+        const totalCostsExclSellingForBreakeven =
+          values.purchasePrice +
+          values.purchaseClosingCosts +
+          totalRehab +
+          totalHolding +
+          points +
+          values.originationFees +
+          totalInterest;
+
+        const breakeven = (1 - sellPct) > 0 ? (totalCostsExclSellingForBreakeven / (1 - sellPct)) : Infinity;
+
+        const profitPerMonth = values.holdingMonths > 0 ? (netProfit / values.holdingMonths) : netProfit;
+
+        return {
+          mode: "loan",
+          contingencyAmt,
+          totalRehab,
+          totalHolding,
+          sellingCosts,
+          netProceeds,
+          cashInvested,
+          totalProjectCosts,
+          totalCostsExclSellingForBreakeven,
+          breakeven,
+          netProfit,
+          roi,
+          coc,
+          loanAmount: purchaseLoanAmount,
+          downPayment,
+          points,
+          totalInterest,
+          payoff,
+          netAfterPayoff,
+          profitPerMonth
+        };
+      }
+
+      // -----------------------------
+      // Render outputs
+      // -----------------------------
+      function render(result){
+        const profitClass = result.netProfit >= 0 ? "good" : "bad";
+        el.outNetProfit.textContent = fmtCurrency(result.netProfit);
+        el.outNetProfit.classList.remove("good","bad");
+        el.outNetProfit.classList.add(profitClass);
+
+        const pct = result.mode === "loan" ? result.coc : result.roi;
+        el.outRoiPct.textContent = fmtPct(pct);
+
+        el.outCashInvested.textContent = fmtCurrency(result.cashInvested);
+        el.outNetProceeds.textContent = fmtCurrency(result.netProceeds);
+        el.outTotalCosts.textContent = fmtCurrency(result.totalProjectCosts);
+
+        el.outSellingCosts.textContent = fmtCurrency(result.sellingCosts);
+        el.outRehabTotal.textContent = fmtCurrency(result.totalRehab);
+        el.outHoldingTotal.textContent = fmtCurrency(result.totalHolding);
+
+        el.outBreakeven.textContent = isFinite(result.breakeven) ? fmtCurrency(result.breakeven) : "N/A";
+        el.outProfitPerMonth.textContent = fmtCurrency2(result.profitPerMonth);
+
+        if (result.mode === "loan"){
+          el.outLoanAmount.textContent = fmtCurrency(result.loanAmount);
+          el.outDownPayment.textContent = fmtCurrency(result.downPayment);
+          el.outPoints.textContent = fmtCurrency(result.points);
+          el.outInterest.textContent = fmtCurrency(result.totalInterest);
+          el.outPayoff.textContent = fmtCurrency(result.payoff);
+          el.outNetAfterPayoff.textContent = fmtCurrency(result.netAfterPayoff);
+        }
+      }
+
+      // -----------------------------
+      // Recalc pipeline
+      // -----------------------------
+      function recalcAndRender(){
+        const values = readValues();
+        const errors = validateInputs(values);
+        showErrors(errors);
+
+        // Even with errors, render something (but calculations may be less meaningful)
+        const result = calculate(values);
+        render(result);
+      }
+
+      // -----------------------------
+      // Reset
+      // -----------------------------
+      function applyDefaults(){
+        // mode
+        el.modeRadios.forEach(r => r.checked = (r.value === DEFAULTS.mode));
+        setMode(DEFAULTS.mode);
+
+        // common
+        el.purchasePrice.value = String(DEFAULTS.purchasePrice);
+        el.purchaseClosingCosts.value = String(DEFAULTS.purchaseClosingCosts);
+        el.renoBudget.value = String(DEFAULTS.renoBudget);
+        el.contingencyPct.value = String(DEFAULTS.contingencyPct);
+        el.holdingMonths.value = String(DEFAULTS.holdingMonths);
+        el.monthlyHolding.value = String(DEFAULTS.monthlyHolding);
+
+        el.salePrice.value = String(DEFAULTS.salePrice);
+        el.sellingCostPct.value = String(DEFAULTS.sellingCostPct);
+
+        // loan
+        el.downPaymentPct.value = String(DEFAULTS.downPaymentPct);
+        el.aprPct.value = String(DEFAULTS.aprPct);
+        el.loanTermMonths.value = String(DEFAULTS.loanTermMonths); // 0 means default to holding
+        el.pointsPct.value = String(DEFAULTS.pointsPct);
+        el.originationFees.value = String(DEFAULTS.originationFees);
+        el.interestType.value = DEFAULTS.interestType;
+
+        el.rehabFinanced.checked = DEFAULTS.rehabFinanced;
+        el.rehabLoanAmount.value = String(DEFAULTS.rehabLoanAmount);
+
+        toggleRehabFinancedUI();
+        recalcAndRender();
+      }
+
+      // -----------------------------
+      // Event listeners
+      // -----------------------------
+      // Mode toggle
+      el.modeRadios.forEach(r => {
+        r.addEventListener("change", () => {
+          setMode(getMode());
+        });
+      });
+
+      // Any input change triggers recalculation
+      const inputs = Array.from(form.querySelectorAll("input, select"));
+      inputs.forEach(inp => {
+        inp.addEventListener("input", () => {
+          if (inp === el.holdingMonths && getMode() === "loan"){
+            // keep loan term synced unless user has set it explicitly to something else
+            const currentTerm = toNum(el.loanTermMonths.value);
+            if (!currentTerm || currentTerm === 0){
+              el.loanTermMonths.value = String(toNum(el.holdingMonths.value) || 0);
+            }
+          }
+          if (inp === el.rehabFinanced){
+            toggleRehabFinancedUI();
+          }
+          recalcAndRender();
+        });
+        inp.addEventListener("change", () => {
+          if (inp === el.rehabFinanced){
+            toggleRehabFinancedUI();
+          }
+          recalcAndRender();
+        });
+      });
+
+      // Buttons
+      el.calcBtn.addEventListener("click", recalcAndRender);
+      el.resetBtn.addEventListener("click", applyDefaults);
+
+      // Prevent actual submission
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        recalcAndRender();
+      });
+
+      // Init
+      applyDefaults();
+
+      // Ensure mode UI is correct on load (after defaults)
+      setMode(getMode());
+    })();
+  </script>
+</body>
+</html>
